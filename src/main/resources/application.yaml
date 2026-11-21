@@ -10,7 +10,12 @@ spring:
       qdrant:
         host: 192.168.123.105
         port: 6334
-        collection-name: documents
+        collection-name: test_1
         use-tls: false
-        initialize-schema: true
+        initialize-schema: false
 
+app:
+  qdrant:
+    vector-size: 1024
+    shard-number: 1          # 로컬/단일 노드는 1
+    replication-factor: 1    # 단일 노드는 반드시 1
