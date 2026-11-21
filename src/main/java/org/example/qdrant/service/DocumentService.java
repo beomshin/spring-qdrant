@@ -1,5 +1,6 @@
 package org.example.qdrant.service;
 
+import org.example.qdrant.dto.AvgSearchResponse;
 import org.example.qdrant.dto.SearchResponse;
 import org.springframework.ai.document.Document;
 
@@ -14,4 +15,6 @@ public interface DocumentService {
     Document getDocument(String id);
 
     List<SearchResponse> searchDocuments(String content, int topK, Double threshold);
+
+    AvgSearchResponse searchAverage(String content, int k, double threshold);
 }

@@ -2,6 +2,7 @@ package org.example.qdrant.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.qdrant.dto.AvgSearchResponse;
 import org.example.qdrant.dto.SearchResponse;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -72,6 +74,37 @@ public class DocumentServiceImpl implements DocumentService {
                     return new SearchResponse(doc.getId(), doc.getText(), score, distance);
                 })
                 .toList();
+    }
+
+    @Override
+    public AvgSearchResponse searchAverage(String content, int k, double threshold) {
+        // similarityThreshold는 걸지 않음 (낮은 점수도 평균에 포함시켜야 정확함)
+        List<Document> docs = vectorStore.similaritySearch(
+                SearchRequest.builder()
+                        .query(content)
+                        .topK(k)
+                        .build()
+        );
+
+        List<SearchResponse> neighbors = docs.stream()
+                .map(doc -> {
+                    Double score = doc.getScore();
+                    Double distance = score == null ? null : 1.0 - score;
+                    return new SearchResponse(doc.getId(), doc.getText(), score, distance);
+                })
+                .toList();
+
+        double avgScore = docs.stream()
+                .map(Document::getScore)
+                .filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(0.0);               // 결과가 하나도 없으면 0.0
+
+        double avgDistance = 1.0 - avgScore;
+        boolean passed = !docs.isEmpty() && avgScore >= threshold;
+
+        return new AvgSearchResponse(k, docs.size(), avgScore, avgDistance, threshold, passed, neighbors);
     }
 
 }

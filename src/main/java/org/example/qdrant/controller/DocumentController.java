@@ -2,6 +2,7 @@ package org.example.qdrant.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.qdrant.dto.AvgSearchResponse;
 import org.example.qdrant.dto.SearchResponse;
 import org.example.qdrant.service.DocumentService;
 import org.springframework.ai.document.Document;
@@ -47,6 +48,16 @@ public class DocumentController {
         Double threshold = body.get("threshold") == null ? null : ((Number) body.get("threshold")).doubleValue();
 
         return documentService.searchDocuments(content, topK, threshold);
+    }
+
+    // POST /search/average  {"content": "test", "k": 5, "threshold": 0.65}
+    @PostMapping("/search/average")
+    public AvgSearchResponse searchAverage(@RequestBody Map<String, Object> body) {
+        String content = (String) body.get("content");
+        int k = body.get("k") == null ? 5 : ((Number) body.get("k")).intValue();
+        double threshold = body.get("threshold") == null ? 0.65 : ((Number) body.get("threshold")).doubleValue();
+
+        return documentService.searchAverage(content, k, threshold);
     }
 
 }
