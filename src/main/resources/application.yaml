@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: spring-qdrant
+  ai:
+    ollama:
+      base-url: http://192.168.123.106:11434
+      embedding:
+        model: bge-m3
+    vectorstore:
+      qdrant:
+        host: 192.168.123.105
+        port: 6334
+        collection-name: documents
+        use-tls: false
+        initialize-schema: true
+
