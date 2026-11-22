@@ -50,14 +50,15 @@ public class DocumentController {
         return documentService.searchDocuments(content, topK, threshold);
     }
 
-    // POST /search/average  {"content": "test", "k": 5, "threshold": 0.65}
+    // POST /search/average  {"content": "test", "k": 5, "threshold": 0.65, "source": "api"}
     @PostMapping("/search/average")
     public AvgSearchResponse searchAverage(@RequestBody Map<String, Object> body) {
         String content = (String) body.get("content");
         int k = body.get("k") == null ? 5 : ((Number) body.get("k")).intValue();
         double threshold = body.get("threshold") == null ? 0.65 : ((Number) body.get("threshold")).doubleValue();
+        String source = (String) body.get("source");   // 선택값
 
-        return documentService.searchAverage(content, k, threshold);
+        return documentService.searchAverage(content, k, threshold, source);
     }
 
 }

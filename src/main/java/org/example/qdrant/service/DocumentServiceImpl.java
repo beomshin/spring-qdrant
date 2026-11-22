@@ -7,6 +7,7 @@ import org.example.qdrant.dto.SearchResponse;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 
@@ -77,14 +78,18 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public AvgSearchResponse searchAverage(String content, int k, double threshold) {
-        // similarityThreshold는 걸지 않음 (낮은 점수도 평균에 포함시켜야 정확함)
-        List<Document> docs = vectorStore.similaritySearch(
-                SearchRequest.builder()
-                        .query(content)
-                        .topK(k)
-                        .build()
-        );
+    public AvgSearchResponse searchAverage(String content, int k, double threshold, String source) {
+        SearchRequest.Builder builder = SearchRequest.builder()
+                .query(content)
+                .topK(k);
+
+        // source가 넘어온 경우에만 필터 적용 (null이면 전체 대상)
+        if (source != null && !source.isBlank()) {
+            Filter.Expression filter = new FilterExpressionBuilder().eq("source", source).build();
+            builder.filterExpression(filter);
+        }
+
+        List<Document> docs = vectorStore.similaritySearch(builder.build());
 
         List<SearchResponse> neighbors = docs.stream()
                 .map(doc -> {
@@ -99,7 +104,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .filter(Objects::nonNull)
                 .mapToDouble(Double::doubleValue)
                 .average()
-                .orElse(0.0);               // 결과가 하나도 없으면 0.0
+                .orElse(0.0);
 
         double avgDistance = 1.0 - avgScore;
         boolean passed = !docs.isEmpty() && avgScore >= threshold;

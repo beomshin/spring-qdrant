@@ -57,83 +57,28 @@ public class QdrantCollectionInitializer implements ApplicationRunner {
                         .setCollectionName(collectionName)
 
                         // ===================== 벡터 설정 =====================
-                        .setVectorsConfig(VectorsConfig.newBuilder()
-                                .setParams(VectorParams.newBuilder()
-                                        .setSize(vectorSize)
-
-                                        // Cosine / Dot / Euclid / Manhattan (생성 후 변경 불가)
-                                        .setDistance(Distance.Cosine)
-
-                                        // 원본 벡터를 디스크(mmap)에 저장. RAM 절약, SSD/NVMe 권장
-                                        .setOnDisk(true)
-
-                                        // [추가] 벡터 저장 정밀도
-                                        //  - Float32: 기본값, 가장 정확
-                                        //  - Float16: 메모리/디스크 절반, 정확도 손실은 대부분 미미
-                                        //  - Uint8  : 1/4로 줄지만 임베딩이 uint8 범위일 때만 사용
-                                        .setDatatype(Datatype.Float16)
-                                        .build())
-                                .build())
+                        .setVectorsConfig(createVectorsConfig())
 
                         // ===================== HNSW 인덱스 =====================
-                        .setHnswConfig(HnswConfigDiff.newBuilder()
-                                .setM(16)                // 연결 수. 클수록 정확도↑ 메모리↑
-                                .setEfConstruct(100)     // 구축 시 탐색 범위. 클수록 품질↑ 구축 느림
-                                .setOnDisk(false)        // 인덱스는 메모리 유지 (검색 속도)
-
-                                // [추가] 세그먼트 크기(KB)가 이 값보다 작으면 HNSW 대신 전체 스캔
-                                //  - 필터가 매우 엄격할 때도 이 기준으로 전체 스캔을 선택함
-                                //  - 기본값 10000. 크게 하면 정확도 안정, 작게 하면 인덱스 사용 증가
-                                .setFullScanThreshold(10000)
-                                .build())
+                        .setHnswConfig(createHnswConfigDiff())
 
                         // ===================== Scalar Quantization =====================
-                        .setQuantizationConfig(QuantizationConfig.newBuilder()
-                                .setScalar(ScalarQuantization.newBuilder()
-                                        .setType(QuantizationType.Int8)
-                                        .setQuantile(0.99f)
-                                        .setAlwaysRam(true)
-                                        .build())
-                                .build())
-
+                        .setQuantizationConfig(createQuantizationConfig())
                         // ===================== payload =====================
                         .setOnDiskPayload(true)
-
                         // ===================== [추가] Optimizer 설정 =====================
                         // 백그라운드에서 세그먼트를 병합하고 인덱스를 만드는 정책
-                        .setOptimizersConfig(OptimizersConfigDiff.newBuilder()
-
-                                // 세그먼트가 이 크기(KB)를 넘으면 HNSW 인덱스를 생성. 기본값 20000
-                                //  - 그 미만은 인덱스 없이 전체 스캔
-                                //  - 대량 일괄 적재 시 크게 잡았다가 적재 후 낮추는 방식도 많이 씀
-                                .setIndexingThreshold(20000)
-
-                                // 세그먼트 개수. 0이면 CPU 코어 수에 맞춰 자동
-                                //  - 많을수록: 동시 검색/쓰기 처리량↑
-                                //  - 적을수록: 단일 검색 지연 시간↓ (세그먼트를 적게 훑음)
-                                .setDefaultSegmentNumber(0)
-
-                                // 삭제된 벡터 비율이 이 값을 넘으면 세그먼트를 정리(vacuum). 기본값 0.2
-                                //  - 삭제/수정이 잦은 서비스에서 디스크 낭비를 막아줌
-                                .setDeletedThreshold(0.2)
-                                .build())
-
+                        .setOptimizersConfig(createOptimizersConfigDiff())
                         // ===================== [추가] WAL 설정 =====================
                         // 쓰기 전 로그. 장애 시 데이터 복구에 사용
-                        .setWalConfig(WalConfigDiff.newBuilder()
-                                // WAL 세그먼트 크기(MB). 기본값 32
-                                //  - 쓰기가 매우 많다면 키우는 걸 고려
-                                .setWalCapacityMb(32)
-                                .build())
-
+                        .setWalConfig(createWalConfigDiff())
                         // ===================== [추가] 분산 설정 =====================
                         .setShardNumber(shardNumber)
                         .setReplicationFactor(replicationFactor)
                         .build()
         ).get();
 
-        log.info("Qdrant collection '{}' created (size={}, Cosine, SQ int8, Float16).",
-                collectionName, vectorSize);
+        log.info("Qdrant collection '{}' created (size={}, Cosine, SQ int8, Float16).", collectionName, vectorSize);
 
         createPayloadIndexes();
     }
@@ -152,5 +97,70 @@ public class QdrantCollectionInitializer implements ApplicationRunner {
         ).get();
 
         log.info("Payload index created on '{}'.", "source");
+    }
+
+    private VectorsConfig createVectorsConfig() {
+        return VectorsConfig.newBuilder()
+                .setParams(VectorParams.newBuilder()
+                        .setSize(vectorSize)
+                        .setDistance(Distance.Cosine)   // Cosine / Dot / Euclid / Manhattan (생성 후 변경 불가)
+                        .setOnDisk(true)                // 원본 벡터를 디스크(mmap)에 저장. RAM 절약, SSD/NVMe 권장
+                        // 벡터 저장 정밀도
+                        //  - Float32: 기본값, 가장 정확
+                        //  - Float16: 메모리/디스크 절반, 정확도 손실은 대부분 미미
+                        //  - Uint8  : 1/4로 줄지만 임베딩이 uint8 범위일 때만 사용
+                        .setDatatype(Datatype.Float16)
+                        .build())
+                .build();
+    }
+
+    private HnswConfigDiff createHnswConfigDiff() {
+        return HnswConfigDiff.newBuilder()
+                .setM(16)                // 연결 수. 클수록 정확도↑ 메모리↑
+                .setEfConstruct(100)     // 구축 시 탐색 범위. 클수록 품질↑ 구축 느림
+                .setOnDisk(false)        // 인덱스는 메모리 유지 (검색 속도)
+
+                // 세그먼트 크기(KB)가 이 값보다 작으면 HNSW 대신 전체 스캔
+                //  - 필터가 매우 엄격할 때도 이 기준으로 전체 스캔을 선택함
+                //  - 기본값 10000. 크게 하면 정확도 안정, 작게 하면 인덱스 사용 증가
+                .setFullScanThreshold(10000)
+                .build();
+    }
+
+    private QuantizationConfig createQuantizationConfig() {
+        return QuantizationConfig.newBuilder()
+                .setScalar(ScalarQuantization.newBuilder()
+                        .setType(QuantizationType.Int8) // 32비트 실수를 8비트 정수로 압축(약 4배 메모리 절감)
+                        .setQuantile(0.99f) // 양자화 범위를 결정할 분위수(0.5 ~ 1.0)를 설정합니다 극단적인 이상치(Outlier) 값을 제외하여 나머지 일반 데이터들의 정밀도 손실을 최소화하는 역할
+                        .setAlwaysRam(true) // 양자화된 벡터를 RAM에 상시 고정할지 여부를 결정
+                        .build())
+                .build();
+    }
+
+    private OptimizersConfigDiff createOptimizersConfigDiff() {
+        return OptimizersConfigDiff.newBuilder()
+
+                // 세그먼트가 이 크기(KB)를 넘으면 HNSW 인덱스를 생성. 기본값 20000
+                //  - 그 미만은 인덱스 없이 전체 스캔
+                //  - 대량 일괄 적재 시 크게 잡았다가 적재 후 낮추는 방식도 많이 씀
+                .setIndexingThreshold(10000)
+
+                // 세그먼트 개수. 0이면 CPU 코어 수에 맞춰 자동
+                //  - 많을수록: 동시 검색/쓰기 처리량↑
+                //  - 적을수록: 단일 검색 지연 시간↓ (세그먼트를 적게 훑음)
+                .setDefaultSegmentNumber(0)
+
+                // 삭제된 벡터 비율이 이 값을 넘으면 세그먼트를 정리(vacuum). 기본값 0.2
+                //  - 삭제/수정이 잦은 서비스에서 디스크 낭비를 막아줌
+                .setDeletedThreshold(0.2)
+                .build();
+    }
+
+    private WalConfigDiff createWalConfigDiff() {
+        return WalConfigDiff.newBuilder()
+                // WAL 세그먼트 크기(MB). 기본값 32
+                //  - 쓰기가 매우 많다면 키우는 걸 고려
+                .setWalCapacityMb(32)
+                .build();
     }
 }

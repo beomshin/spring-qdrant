@@ -16,5 +16,6 @@ public interface DocumentService {
 
     List<SearchResponse> searchDocuments(String content, int topK, Double threshold);
 
-    AvgSearchResponse searchAverage(String content, int k, double threshold);
+    AvgSearchResponse searchAverage(String content, int k, double threshold, String source);
+
 }
